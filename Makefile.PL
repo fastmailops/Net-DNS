@@ -222,65 +222,6 @@ END
 }
 
 
-sub install {
-	my $self = shift;
-
-	my %install_type = qw(perl INSTALLPRIVLIB site INSTALLSITELIB vendor INSTALLVENDORLIB);
-	my $install_site = join '', '$(DESTDIR)$(', $install_type{$self->{INSTALLDIRS}}, ')';
-	for ($install_site) {
-		s/\$\(([A-Z_]+)\)/$self->{$1}/eg while /\$\(/;	# expand Makefile macros
-		s|([/])[/]+|$1|g;				# remove gratuitous //s
-	}
-
-	eval 'require Net::DNS';
-	my @version = grep $_, ( 'version', $Net::DNS::VERSION );
-
-	my $nameregex = '\W+Net\WDNS.pm$';
-	my @installed = grep $_ && m/$nameregex/io, values %INC;
-	my %noinstall;
-
-	foreach (@installed) {
-		my $path = $1 if m/^(.+)$nameregex/i;
-		my %seen;
-		foreach (@INC) {
-			$seen{$_}++;				# find $path in @INC
-			last if $_ eq $path;
-		}
-		foreach ( grep !$seen{$_}, @INC ) {
-			$noinstall{$_}++;			# mark hidden libraries
-		}
-	}
-
-	return $self->SUPER::install(@_) unless $noinstall{$install_site};
-
-	my $message;
-	warn $message = <<"AMEN";
-##
-##	The install location for this version of Net::DNS differs
-##	from the existing @version in your perl library at
-##	@installed
-##
-##	The installation will be rendered ineffective because the
-##	library search finds the existing version before reaching
-##	$install_site
-##
-##	The generated Makefile supports build and test only.
-##
-AMEN
-	my $echo = '	$(NOECHO) $(ECHO) "##"';
-	$message =~ s/##/$echo/eg;
-
-	return join '', <<'END', $message;
-install :
-	$(NOECHO) $(ECHO) "##	Makefile supports build and test only"
-	$(NOECHO) $(ECHO) "##	(see message from Makefile.PL)"
-	$(NOECHO) $(FALSE)
-
-test :: $(TEST_TYPE)
-END
-}
-
-
 sub postamble {
 	return <<'END';
 test_cover :
